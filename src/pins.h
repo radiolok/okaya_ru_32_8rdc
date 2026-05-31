@@ -3,65 +3,81 @@
 
 #include <avr/io.h>
 
-// SPI to 74HC595 chain
-#define PIN_595_MOSI  PB3
-#define PIN_595_SCK   PB5
-#define PIN_595_SS    PB2
+/** @defgroup pins_spi SPI to 74HC595 chain */
+/** @{ */
+#define PIN_595_MOSI  PB3  /**< SPI MOSI → 595#1 DS */
+#define PIN_595_SCK   PB5  /**< SPI SCK  → both 595 SHCP */
+#define PIN_595_SS    PB2  /**< SPI SS   → forced OUTPUT (prevents slave mode) */
+/** @} */
 
-// RCLK (STCP) — common latch for both 595
-#define PIN_STCP      PD2
+/** @defgroup pins_stcp RCLK (STCP) — common latch for both 595 */
+/** @{ */
+#define PIN_STCP      PD2  /**< RCLK pin */
 #define PORT_STCP     PORTD
 #define DDR_STCP      DDRD
-#define MASK_STCP     (1 << PD2)
+#define MASK_STCP     (1 << PD2)  /**< RCLK bitmask */
+/** @} */
 
-// Display control signals
-#define PIN_NS7       PD3
+/** @defgroup pins_strobes Display control signals */
+/** @{ */
+#define PIN_NS7       PD3  /**< NS7 strobe (reserved) */
 #define PORT_NS7      PORTD
 #define DDR_NS7       DDRD
 #define MASK_NS7      (1 << PD3)
 
-#define PIN_NS8       PD4
+#define PIN_NS8       PD4  /**< NS8 data latch into display */
 #define PORT_NS8      PORTD
 #define DDR_NS8       DDRD
 #define MASK_NS8      (1 << PD4)
 
-#define PIN_nAD       PD5
+#define PIN_nAD       PD5  /**< ~AD address/data strobe (active low) */
 #define PORT_nAD      PORTD
 #define DDR_nAD       DDRD
 #define MASK_nAD      (1 << PD5)
 
-#define PIN_nAS       PD6
+#define PIN_nAS       PD6  /**< ~AS address strobe into display (active low) */
 #define PORT_nAS      PORTD
 #define DDR_nAS       DDRD
 #define MASK_nAS      (1 << PD6)
+/** @} */
 
-// NS4 — input from display (D-trigger divider /4)
-#define PIN_NS4       PC4
+/** @defgroup pins_ns4 NS4 — input from display (D-trigger divider /4) */
+/** @{ */
+#define PIN_NS4       PC4  /**< NS4 input pin */
 #define PORT_NS4      PORTC
 #define DDR_NS4       DDRC
-#define PIN_NS4_REG   PINC
+#define PIN_NS4_REG   PINC /**< Input register for reading NS4 */
 #define MASK_NS4      (1 << PC4)
+/** @} */
 
-#define PIN_nWR       PC0
+/** @defgroup pins_other Other display signals */
+/** @{ */
+#define PIN_nWR       PC0  /**< ~WR write strobe (active low) */
 #define PORT_nWR      PORTC
 #define DDR_nWR       DDRC
 #define MASK_nWR      (1 << PC0)
 
-#define PIN_nBL       PC1
+#define PIN_nBL       PC1  /**< ~BL blanking (active low — disables ROM output) */
 #define PORT_nBL      PORTC
 #define DDR_nBL       DDRC
 #define MASK_nBL      (1 << PC1)
 
-#define PIN_nRESET    PC2
+#define PIN_nRESET    PC2  /**< ~RESET display RAM reset (active low) */
 #define PORT_nRESET   PORTC
 #define DDR_nRESET    DDRC
 #define MASK_nRESET   (1 << PC2)
+/** @} */
 
-// HV boost converter
-#define PIN_HV_ADC    PC3
-#define PIN_HV_PWM    PB1
+/** @defgroup pins_hv HV boost converter */
+/** @{ */
+#define PIN_HV_ADC    PC3  /**< HV feedback via 470k/10k divider (ADC3) */
+#define PIN_HV_PWM    PB1  /**< Boost PWM output (OC1A) */
+/** @} */
 
-#define PIN_UART_RX   PD0
-#define PIN_UART_TX   PD1
+/** @defgroup pins_uart UART */
+/** @{ */
+#define PIN_UART_RX   PD0  /**< UART RX */
+#define PIN_UART_TX   PD1  /**< UART TX */
+/** @} */
 
 #endif

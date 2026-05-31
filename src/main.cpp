@@ -12,6 +12,19 @@ void setup() {
     Serial.begin(115200);
 }
 
+#ifdef DEBUG_PATTERN
+void loop() {
+    static uint8_t addr = 0;
+
+    bool ns4 = (PIN_NS4_REG & MASK_NS4) != 0;
+
+    if (ns4) {
+        uint8_t data = (addr & 1) ? 0x55 : 0xAA;
+        display_write_raw(addr, data);
+        addr++;
+    }
+}
+#else
 void loop() {
     while (Serial.available()) {
         char c = (char)Serial.read();
@@ -25,3 +38,4 @@ void loop() {
         last_flush = now;
     }
 }
+#endif

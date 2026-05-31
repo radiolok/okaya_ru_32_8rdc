@@ -4,32 +4,38 @@
 #include "pins.h"
 #include <Arduino.h>
 
+#define STROBE_DELAY_CYCLES ((F_CPU / 1000000UL) * DISP_STROBE_DELAY_US)
+
+static inline void strobe_delay() {
+    __builtin_avr_delay_cycles(STROBE_DELAY_CYCLES);
+}
+
 void strobe_nAS() {
     PORT_nAS &= ~MASK_nAS;
-    delayMicroseconds(DISP_STROBE_DELAY_US);
+    strobe_delay();
     PORT_nAS |= MASK_nAS;
-    delayMicroseconds(DISP_STROBE_DELAY_US);
+    strobe_delay();
 }
 
 void strobe_nAD() {
     PORT_nAD &= ~MASK_nAD;
-    delayMicroseconds(DISP_STROBE_DELAY_US);
+    strobe_delay();
     PORT_nAD |= MASK_nAD;
-    delayMicroseconds(DISP_STROBE_DELAY_US);
+    strobe_delay();
 }
 
-void strobe_NS8() {
-    PORT_NS8 |= MASK_NS8;
-    delayMicroseconds(DISP_STROBE_DELAY_US);
-    PORT_NS8 &= ~MASK_NS8;
-    delayMicroseconds(DISP_STROBE_DELAY_US);
+void strobe_NS78() {
+    PORTD |= (MASK_NS7 | MASK_NS8);
+    strobe_delay();
+    PORTD &= ~(MASK_NS7 | MASK_NS8);
+    strobe_delay();
 }
 
 void strobe_nWR() {
     PORT_nWR &= ~MASK_nWR;
-    delayMicroseconds(DISP_STROBE_DELAY_US);
+    strobe_delay();
     PORT_nWR |= MASK_nWR;
-    delayMicroseconds(DISP_STROBE_DELAY_US);
+    strobe_delay();
 }
 
 void strobe_nRESET() {
@@ -78,11 +84,11 @@ void display_init() {
 
 void display_write_raw(uint8_t addr, uint8_t data) {
     shift595_write(addr, data);
-    delayMicroseconds(DISP_STROBE_DELAY_US);
+    strobe_delay();
 
     strobe_nAS();
     strobe_nAD();
-    strobe_NS8();
+    strobe_NS78();
     strobe_nWR();
 }
 
