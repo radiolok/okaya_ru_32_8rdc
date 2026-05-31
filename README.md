@@ -1,0 +1,139 @@
+# Okaya RU-32-8-RDC VFD Terminal
+
+Firmware for the Okaya RU-32-8-RDC vacuum fluorescent display module, turning it into a VT100-compatible serial terminal using an Arduino Nano (ATmega328P).
+
+## Hardware Overview
+
+| Component | Spec |
+|-----------|------|
+| Display | Okaya RU-32-8-RDC, 32 columns × 8 rows |
+| Controller | Arduino Nano (ATmega328P @ 16 MHz) |
+| Logic supply | 5 V (shared with Nano) |
+| Anode supply | 160 V via boost converter |
+| Boost inductor | 100 µH / 3 A |
+| Output capacitor | 10 µF |
+| HV feedback divider | 470 kΩ / 10 kΩ → 3.33 V at 160 V |
+| UART baud rate | 115200 |
+| Shift registers | 2× 74HC595 (addr + data bus, daisy-chained) |
+
+## Pin Connections
+
+| Nano Pin | ATmega Port | Direction | Display Signal | Function |
+|----------|-------------|-----------|---------------|----------|
+| D13 | PB5 | OUT | SCK (SHCP) | SPI clock → both 595 |
+| D11 | PB3 | OUT | MOSI (DS) | SPI data → 595#1 Q7' → 595#2 |
+| D10 | PB2 | OUT | SS | SPI slave-select (forced OUTPUT to stay master) |
+| D2 | PD2 | OUT | STCP (RCLK) | Latch both 595 outputs |
+| D3 | PD3 | OUT | NS7 | Strobe (reserved) |
+| D4 | PD4 | OUT | NS8 | Data latch into display |
+| D5 | PD5 | OUT | ~AD | Address/data strobe |
+| D6 | PD6 | OUT | ~AS | Address strobe into display |
+| A4 | PC4 | **IN** | NS4 | Display feedback (D-flop /4 divider) |
+| A0 | PC0 | OUT | ~WR | Write strobe |
+| A1 | PC1 | OUT | ~BL | Blanking (active low — blanks ROM output) |
+| A2 | PC2 | OUT | ~RESET | Display RAM reset (active low) |
+| A3 | PC3 | IN | HV FB | HV feedback (ADC3) via 470k/10k divider |
+| D9 | PB1 | OUT | HV PWM | Boost converter PWM (OC1A, 80 kHz) |
+| D0 | PD0 | IN | UART RX | Serial input |
+| D1 | PD1 | OUT | UART TX | Serial output |
+
+### Stacking order (data flows left to right)
+
+```
+MOSI (PB3) → 595#1.DS → 595#1.Q7' → 595#2.DS
+SCK  (PB5) → 595#1.SHCP + 595#2.SHCP
+RCLK (PD2) → 595#1.STCP + 595#2.STCP
+```
+
+- **595#1** (nearest to MOSI): addr bus → display address lines
+- **595#2** (chained from #1): data bus → display character code
+
+16-bit SPI frame: data byte first (shifts through to 595#2), addr byte second (lands in 595#1).
+
+## Write Protocol
+
+The hypothesized write sequence (to be verified on hardware):
+
+1. `shift595_write(addr, data)` — shift 16 bits, pulse RCLK
+2. Pulse `~AS` (address latch)
+3. Pulse `~AD` (address/data strobe)
+4. Pulse `NS8` (data latch into display)
+5. Pulse `~WR` (write execute)
+
+Address map: linear `addr = col + row × 32` (0–255).
+
+## Boost Converter
+
+| Parameter | Value |
+|-----------|-------|
+| Frequency | 80 kHz (Timer1 Fast PWM, ICR1=24, prescaler 8) |
+| Resolution | 25 steps (5-bit) |
+| Regulation | P-controller @ 9.6 kHz (ADC free-running + ISR) |
+| Soft-start | 1.5 s linear ramp, then regulator takeover |
+| Timeout | 3 s to reach target, emergency shutdown on failure |
+| Target ADC | 683 (10-bit, AVCC ref) = 160 V ÷ 480k × 10k = 3.33 V |
+
+## Features
+
+- **32×8** character buffer with dirty-tracking (partial refresh)
+- **Insert/replace** modes
+- **Scrolling** on overflow
+- **VT100 subset**:
+  - `ESC[H`, `ESC[row;colH` / `ESC[row;colf` — cursor positioning
+  - `ESC[nA` / `B` / `C` / `D` — cursor movement
+  - `ESC[J` / `ESC[0J` / `ESC[1J` / `ESC[2J` — screen erase
+  - `ESC[K` / `ESC[0K` / `ESC[1K` / `ESC[2K` — line erase
+  - `ESC[4h` / `ESC[4l` — insert/replace mode
+  - `ESC c` — terminal reset
+- **Control characters**: CR, LF, BS, TAB
+- **Blanking** during full-screen refresh (no flicker)
+- **Async regulator**: ADC interrupt-driven, no blocking in main loop
+
+## Build & Upload
+
+Requires [PlatformIO](https://platformio.org/). Build:
+
+```bash
+pio run
+```
+
+Upload to connected Arduino Nano:
+
+```bash
+pio run --target upload
+```
+
+Monitor serial output:
+
+```bash
+pio device monitor --baud 115200
+```
+
+### Memory
+
+| Resource | Used | Available |
+|----------|------|-----------|
+| Flash | ~4.4 KB | 30.7 KB |
+| RAM | 724 B | 2048 B |
+
+## Project Structure
+
+```
+okaya_vfd_terminal/
+├── platformio.ini
+├── src/
+│   ├── main.cpp           # Setup, main loop (serial → parser → flush)
+│   ├── pins.h             # All pin definitions
+│   ├── hal_595.h/cpp      # 74HC595 shift register driver
+│   ├── hal_hv.h/cpp       # HV boost converter (Timer1 PWM + ADC ISR)
+│   ├── display.h/cpp      # Display protocol: strobe sequencing
+│   ├── terminal.h/cpp     # 32×8 buffer, dirty tracking, cursor logic
+│   └── esc_parser.h/cpp   # VT100 ESC-sequence state machine
+```
+
+## Known Limitations
+
+- **Character ROM** is fixed — no custom characters. The ROM map should be verified on hardware (Etap 1 in the implementation plan).
+- **Write protocol** is based on hypotheses about strobe signals `~AS`, `~AD`, `NS7`, `NS8`, `~WR`. Actual timing and sequence need oscilloscope/lab verification.
+- **NS4** (PC4) is an input from the display (D-flop /4 divider). Currently unused but available for synchronization if needed.
+- **~BL** implements binary blanking only (no PWM brightness control).
