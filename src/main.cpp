@@ -11,6 +11,7 @@ void setup() {
     esc_parser_reset();
     Serial.begin(115200);
 
+#ifdef DEBUG_PATTERN
     terminal_set_cursor(0, 0); terminal_puts("ALPHANUMERIC PLASMA DISPLAY 32X8");
     terminal_set_cursor(0, 1); terminal_puts("SPI CONNECT VIA 74HC595N");
     terminal_set_cursor(3, 2); terminal_puts("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
@@ -19,14 +20,11 @@ void setup() {
     terminal_set_cursor(11, 5); terminal_puts("0123456789");
     terminal_set_cursor(0, 6); terminal_puts("When string length more than 32,text continues on the next line.");
     terminal_flush();
+#endif
 }
 
 #ifdef DEBUG_PATTERN
 void loop() {
-    static uint8_t addr = 0;
-    uint8_t data = (addr & 1) ? 0x55 : 0xAA;
-    display_write_raw(addr, data);
-    addr++;
 }
 #else
 void loop() {
