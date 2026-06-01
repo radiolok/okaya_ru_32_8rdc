@@ -10,32 +10,43 @@ static inline void strobe_delay() {
     __builtin_avr_delay_cycles(STROBE_DELAY_CYCLES);
 }
 
-void strobe_nAS() {
+void strobe_aw() {
     PORT_nAS &= ~MASK_nAS;
     strobe_delay();
     PORT_nAS |= MASK_nAS;
     strobe_delay();
 }
 
-void strobe_nAD() {
-    PORT_nAD &= ~MASK_nAD;
+void strobe_clock() {
+    PORT_NS7 |= MASK_NS7;
     strobe_delay();
-    PORT_nAD |= MASK_nAD;
-    strobe_delay();
-}
-
-void strobe_NS78() {
-    PORTD |= (MASK_NS7 | MASK_NS8);
-    strobe_delay();
-    PORTD &= ~(MASK_NS7 | MASK_NS8);
+    PORT_NS7 &= ~MASK_NS7;
     strobe_delay();
 }
 
-void strobe_nWR() {
-    PORT_nWR &= ~MASK_nWR;
-    strobe_delay();
-    PORT_nWR |= MASK_nWR;
-    strobe_delay();
+void set_cs(bool active) {
+    if (active) {
+        PORT_NS8 &= ~MASK_NS8;
+    } else {
+        PORT_NS8 |= MASK_NS8;
+    }
+}
+
+void set_underline(bool on) {
+    if (on) {
+        PORT_nAD &= ~MASK_nAD;
+    } else {
+        PORT_nAD |= MASK_nAD;
+    }
+}
+
+bool wait_ready() {
+    uint16_t timeout = 2000;
+    while (timeout--) {
+        if (PIN_NS4_REG & MASK_NS4) return true;
+        __builtin_avr_delay_cycles(F_CPU / 100000UL);
+    }
+    return false;
 }
 
 void strobe_nRESET() {
@@ -82,14 +93,34 @@ void display_init() {
     set_blank(false);
 }
 
-void display_write_raw(uint8_t addr, uint8_t data) {
+void display_write_raw(uint8_t addr, uint8_t data, bool underline) {
     shift595_write(addr, data);
     strobe_delay();
 
-    strobe_nAS();
-    strobe_nAD();
-    strobe_NS78();
-    strobe_nWR();
+    wait_ready();
+    strobe_aw();
+    set_underline(underline);
+    strobe_clock();
+}
+
+void display_write_batch(uint8_t addr, const uint8_t *data, uint16_t len) {
+    if (len == 0) return;
+
+    shift595_write(addr, data[0]);
+    strobe_delay();
+
+    wait_ready();
+    strobe_aw();
+    set_underline(false);
+    strobe_clock();
+
+    for (uint16_t i = 1; i < len; i++) {
+        shift595_write((uint8_t)(addr + i), data[i]);
+        strobe_delay();
+
+        wait_ready();
+        strobe_clock();
+    }
 }
 
 void display_write(uint8_t col, uint8_t row, uint8_t ch) {

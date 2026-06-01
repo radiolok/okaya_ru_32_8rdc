@@ -16,14 +16,18 @@
 /** @brief Reset pulse width in microseconds. */
 #define DISP_RESET_DELAY_US  100
 
-/** @brief Pulse ~AS (address strobe, active low). */
-void strobe_nAS();
-/** @brief Pulse ~AD (address/data strobe, active low). */
-void strobe_nAD();
-/** @brief Pulse NS7 and NS8 simultaneously (both active high, same PORTD write). */
-void strobe_NS78();
-/** @brief Pulse ~WR (write strobe, active low). */
-void strobe_nWR();
+/** @brief Pulse AW (Address Write): ~AS LOW → delay → HIGH. */
+void strobe_aw();
+/** @brief Pulse CLOCK (character data latch): NS7 HIGH → delay → LOW. */
+void strobe_clock();
+/** @brief Set CS (chip select): NS8 LOW = active, HIGH = inactive. */
+void set_cs(bool active);
+/** @brief Set Underline bit: ~AD LOW = underline ON, HIGH = OFF.
+ *  Call BEFORE strobe_clock() to latch the bit with character data. */
+void set_underline(bool on);
+/** @brief Poll NS4 (READY) until HIGH or timeout.
+ *  @return true if ready, false on timeout. */
+bool wait_ready();
 /** @brief Pulse ~RESET (display RAM reset, active low). */
 void strobe_nRESET();
 /** @brief Control the blanking signal (~BL).
@@ -51,13 +55,26 @@ void display_write(uint8_t col, uint8_t row, uint8_t ch);
 
 /** @brief Write a character at a raw linear address with the full strobe sequence.
  *
- * Sequence: shift595_write(addr, data) → strobe_nAS() → strobe_nAD() →
- * strobe_NS78() → strobe_nWR().
+ * Sequence: shift595_write(addr, data) → strobe_delay() → wait_ready() →
+ * strobe_aw() → set_underline() → strobe_clock().
+ * CS (NS8) is held LOW from display_init(), WR (~WR) is held HIGH.
  *
- * @param addr Linear display address (0–255).
- * @param data Character code.
+ * @param addr      Linear display address (0–255).
+ * @param data      Character code.
+ * @param underline If true, turns on the underline attribute for this character.
  */
-void display_write_raw(uint8_t addr, uint8_t data);
+void display_write_raw(uint8_t addr, uint8_t data, bool underline = false);
+
+/** @brief Batch write contiguous characters with auto-increment.
+ *
+ * Writes first character with full sequence (AW + CLOCK),
+ * subsequent characters with only CLOCK (address auto-increments).
+ *
+ * @param addr Starting linear address (0–255).
+ * @param data Pointer to character codes.
+ * @param len  Number of characters to write.
+ */
+void display_write_batch(uint8_t addr, const uint8_t *data, uint16_t len);
 
 /** @brief Clear the entire display (fill with spaces).
  *

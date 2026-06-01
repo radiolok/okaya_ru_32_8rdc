@@ -24,20 +24,88 @@ Firmware for the Okaya RU-32-8-RDC vacuum fluorescent display module, turning it
 | D11 | PB3 | OUT | MOSI (DS) | SPI data → 595#1 Q7' → 595#2 |
 | D10 | PB2 | OUT | SS | SPI slave-select (forced OUTPUT to stay master) |
 | D2 | PD2 | OUT | STCP (RCLK) | Latch both 595 outputs |
-| D3 | PD3 | OUT | NS7 | Strobe (reserved) |
-| D4 | PD4 | OUT | NS8 | Data latch into display |
-| D5 | PD5 | OUT | ~AD | Address/data strobe |
-| D6 | PD6 | OUT | ~AS | Address strobe into display |
-| A4 | PC4 | **IN** | NS4 | Display feedback (D-flop /4 divider) |
-| A0 | PC0 | OUT | ~WR | Write strobe |
-| A1 | PC1 | OUT | ~BL | Blanking (active low — blanks ROM output) |
-| A2 | PC2 | OUT | ~RESET | Display RAM reset (active low) |
+| D3 | PD3 | OUT | NS7 — CLOCK | Character data latch (active HIGH pulse) |
+| D4 | PD4 | OUT | NS8 — CS | Chip select (active LOW, held LOW during writes) |
+| D5 | PD5 | OUT | ~AD — UL | Underline bit (active LOW: LOW = ON, HIGH = OFF) |
+| D6 | PD6 | OUT | ~AS — AW | Address write strobe (active LOW pulse) |
+| A4 | PC4 | **IN** | NS4 — READY | Display ready (active HIGH, polled with timeout) |
+| A0 | PC0 | OUT | ~WR | Unused, held HIGH |
+| A1 | PC1 | OUT | ~BL | Blanking (active LOW — blanks ROM output) |
+| A2 | PC2 | OUT | ~RESET | Display RAM reset (active LOW pulse) |
 | A3 | PC3 | IN | HV FB | HV feedback (ADC3) via 470k/10k divider |
 | D9 | PB1 | OUT | HV PWM | Boost converter PWM (OC1A, 80 kHz) |
 | D0 | PD0 | IN | UART RX | Serial input |
 | D1 | PD1 | OUT | UART TX | Serial output |
 
-### Stacking order (data flows left to right)
+## Write Protocol
+
+The protocol is derived from the reference implementation by serjsochi (radiokot.ru, 2024) and adapted for our board revision.
+
+### Signal Definitions
+
+| Signal | Nano | Polarity | Role |
+|--------|------|----------|------|
+| CLOCK (NS7) | PD3 | HIGH pulse | Latches character data + auto-increments address |
+| CS (NS8) | PD4 | LOW = active | Chip select — held LOW for all writes |
+| UL (~AD) | PD5 | LOW = ON | Underline attribute bit, latched with data on CLOCK |
+| AW (~AS) | PD6 | LOW pulse | Address write — latches address bus A0–A7 |
+| READY (NS4) | PC4 | HIGH = ready | Display ready flag, polled before each write |
+| WR (~WR) | PC0 | — | Unused, held HIGH |
+| BL (~BL) | PC1 | LOW = blank | Display blanking |
+| RESET (~RESET) | PC2 | LOW pulse | Resets display RAM |
+
+### Write Sequence (per character)
+
+```
+1. shift595_write(addr, data)     — shift 16 bits, pulse RCLK (STCP)
+   Data byte goes first → ends up in 595#2 (D0–D5 bus)
+   Addr byte goes second → ends up in 595#1 (A0–A7 bus)
+
+2. strobe_delay()                 — wait for bus to settle (~1 µs)
+
+3. wait_ready()                   — poll NS4 until HIGH or timeout (~200 ms)
+   If timeout: proceed anyway to avoid hanging the firmware.
+
+4. strobe_aw()                    — pulse ~AS LOW→HIGH
+   Latches the address from A0–A7 into the display.
+
+5. set_underline(on)              — set ~AD level (LOW = underline ON, HIGH = OFF)
+   Must be set BEFORE strobe_clock() — the UL bit is latched together with D0–D5.
+
+6. strobe_clock()                 — pulse NS7 HIGH→LOW
+   Latches D0–D5 + UL into the display character RAM.
+   Auto-increments the internal address counter.
+```
+
+### Batch Write (auto-increment)
+
+After the first character (steps 1–6 above), subsequent characters in a contiguous block
+only need steps 1–3 and 6 — AW is skipped because the display auto-increments its
+internal address pointer after each CLOCK pulse:
+
+```
+for i in 1..N-1:
+    shift595_write(addr + i, data[i])
+    strobe_delay()
+    wait_ready()
+    strobe_clock()                — data latch + auto-increment
+```
+
+This is implemented in `display_write_batch()` and is used by `terminal_flush()`
+when it detects contiguous dirty ranges in the terminal buffer.
+
+### Timing
+
+| Parameter | Value |
+|-----------|-------|
+| Strobe pulse width | ~1 µs (2 cycles at 16 MHz) |
+| Inter-strobe gap | ~1 µs |
+| READY poll interval | ~10 µs per iteration |
+| READY timeout | ~200 ms (2000 iterations) |
+| CS state during write | Held LOW continuously |
+| WR state | Held HIGH always |
+
+### 595 Chain Layout
 
 ```
 MOSI (PB3) → 595#1.DS → 595#1.Q7' → 595#2.DS
@@ -45,22 +113,27 @@ SCK  (PB5) → 595#1.SHCP + 595#2.SHCP
 RCLK (PD2) → 595#1.STCP + 595#2.STCP
 ```
 
-- **595#1** (nearest to MOSI): addr bus → display address lines
-- **595#2** (chained from #1): data bus → display character code
+- **595#1** (nearest to MOSI): receives addr byte → outputs A0–A7
+- **595#2** (chained from #1): receives data byte → outputs D0–D5
 
-16-bit SPI frame: data byte first (shifts through to 595#2), addr byte second (lands in 595#1).
+SPI transfer order: `SPI.transfer(data)` first, `SPI.transfer(addr)` second.
+The data byte shifts through 595#1 into 595#2 via Q7'.
 
-## Write Protocol
+### Address Map
 
-The hypothesized write sequence (to be verified on hardware):
+Linear: `addr = col + row × 32` (0–255). Character code 0x20 = space.
 
-1. `shift595_write(addr, data)` — shift 16 bits, pulse RCLK
-2. Pulse `~AS` (address latch)
-3. Pulse `~AD` (address/data strobe)
-4. Pulse `NS8` (data latch into display)
-5. Pulse `~WR` (write execute)
+### Hardware Notes
 
-Address map: linear `addr = col + row × 32` (0–255).
+- **~AD is UL (Underline), not WIDE.** On our board revision, PD5 controls the underline
+  attribute. If testing shows otherwise, the `set_underline()` function can be replaced
+  with `set_wide()` — the signal function is determined by the display's ROM/decoder.
+- **READY (NS4)** is defined as INPUT in the reference code but was never polled there.
+  Our implementation polls it with a 200 ms timeout per character to avoid data loss
+  while preventing firmware hangs if the pin is floating or grounded.
+- **Auto-increment** is assumed to work as in the reference display. If the display
+  does not auto-increment, `display_write_batch()` will need to be modified to assert
+  AW on every write instead of just the first.
 
 ## Boost Converter
 
@@ -113,8 +186,8 @@ pio device monitor --baud 115200
 
 | Resource | Used | Available |
 |----------|------|-----------|
-| Flash | ~4.4 KB | 30.7 KB |
-| RAM | 724 B | 2048 B |
+| Flash | 3786 B | 30.7 KB |
+| RAM | 913 B | 2048 B |
 
 ## Project Structure
 
@@ -133,10 +206,11 @@ okaya_vfd_terminal/
 
 ## Known Limitations
 
-- **Character ROM** is fixed — no custom characters. The ROM map should be verified on hardware (Etap 1 in the implementation plan).
-- **Write protocol** is based on hypotheses about strobe signals `~AS`, `~AD`, `NS7`, `NS8`, `~WR`. Actual timing and sequence need oscilloscope/lab verification.
-- **NS4** (PC4) is an input from the display (D-flop /4 divider). Currently unused but available for synchronization if needed.
+- **Character ROM** is fixed — no custom characters. The ROM map should be verified on hardware.
+- **~AD pin function** is assumed to be UL (Underline). If the display uses it as WIDE instead, `set_underline()` needs to be replaced with `set_wide()`.
+- **Auto-increment** is assumed to work per the reference display. Verification on hardware pending.
 - **~BL** implements binary blanking only (no PWM brightness control).
+- **DEBUG_PATTERN** build flag (`platformio.ini`) enables a test loop that writes 0x55/0xAA alternating to all 256 addresses — useful for hardware debugging.
 
 ---
 

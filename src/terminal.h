@@ -29,6 +29,15 @@ void terminal_init();
  */
 void terminal_putchar(char c);
 
+/** @brief Write a null-terminated string into the terminal buffer.
+ *
+ * Calls terminal_putchar() for each character in the string.
+ * Does NOT flush — call terminal_flush() afterwards.
+ *
+ * @param s Null-terminated C string.
+ */
+void terminal_puts(const char *s);
+
 /** @brief Flush all dirty buffer cells to the display.
  *
  * Iterates over all 256 positions and writes only those marked dirty

@@ -110,12 +110,21 @@ void terminal_putchar(char c) {
     advance_cursor();
 }
 
+void terminal_puts(const char *s) {
+    while (*s) terminal_putchar(*s++);
+}
+
 void terminal_flush() {
-    for (uint16_t i = 0; i < TERM_SIZE; i++) {
+    uint16_t i = 0;
+    while (i < TERM_SIZE) {
         if (dirty[i]) {
-            uint8_t addr = (uint8_t)i;
-            display_write_raw(addr, buf[i]);
-            dirty[i] = false;
+            uint16_t start = i;
+            while (i < TERM_SIZE && dirty[i]) i++;
+            uint16_t len = i - start;
+            display_write_batch((uint8_t)start, &buf[start], len);
+            for (uint16_t j = start; j < i; j++) dirty[j] = false;
+        } else {
+            i++;
         }
     }
 }
