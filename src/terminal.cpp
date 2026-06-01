@@ -6,6 +6,7 @@ static bool dirty[TERM_SIZE];
 static uint8_t cursor_col = 0;
 static uint8_t cursor_row = 0;
 static bool insert_mode = false;
+static bool newline_pending = false;
 
 void terminal_init() {
     for (uint16_t i = 0; i < TERM_SIZE; i++) {
@@ -59,20 +60,21 @@ static void advance_cursor() {
 }
 
 void terminal_putchar(char c) {
-    if (c == '\r') {
+    if (c == '\r' || c == '\n') {
+        if (newline_pending) {
+            newline_pending = false;
+            return;
+        }
         cursor_col = 0;
-        return;
-    }
-
-    if (c == '\n') {
-        cursor_col = 0;
-        cursor_row++;
-        if (cursor_row >= TERM_ROWS) {
-            cursor_row = TERM_ROWS - 1;
+        if (cursor_row < TERM_ROWS - 1) {
+            cursor_row++;
+        } else {
             scroll_up();
         }
+        newline_pending = true;
         return;
     }
+    newline_pending = false;
 
     if (c == '\b') {
         if (cursor_col > 0) {
