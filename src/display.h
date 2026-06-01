@@ -12,7 +12,7 @@
 #define DISP_SIZE (DISP_COLS * DISP_ROWS)
 
 /** @brief Strobe pulse width in microseconds for control signals. */
-#define DISP_STROBE_DELAY_US 1
+#define DISP_STROBE_DELAY_US 2
 /** @brief Reset pulse width in microseconds. */
 #define DISP_RESET_DELAY_US  100
 

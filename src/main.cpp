@@ -18,7 +18,7 @@ void setup() {
     terminal_set_cursor(2, 3); terminal_puts("@[\\]^_ !\"#$%&'()*+,-./:;<=>?");
     terminal_set_cursor(3, 4); terminal_puts("REGULAR TEXT ONLY");
     terminal_set_cursor(11, 5); terminal_puts("0123456789");
-    terminal_set_cursor(0, 6); terminal_puts("When string length more than 32,text continues on the next line.");
+    terminal_set_cursor(0, 6); terminal_puts("WHEN STRING LENGTH MORE THAN 32,TEXT CONTINUES ON THE NEXT LINE.");
     terminal_flush();
 #endif
 }

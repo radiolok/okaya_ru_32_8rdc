@@ -96,29 +96,27 @@ void display_init() {
 void display_write_raw(uint8_t addr, uint8_t data, bool underline) {
     shift595_write(addr, data);
     strobe_delay();
+    strobe_delay();
 
     wait_ready();
     strobe_aw();
+    strobe_delay();
+    strobe_delay();
     set_underline(underline);
     strobe_clock();
 }
 
 void display_write_batch(uint8_t addr, const uint8_t *data, uint16_t len) {
-    if (len == 0) return;
-
-    shift595_write(addr, data[0]);
-    strobe_delay();
-
-    wait_ready();
-    strobe_aw();
-    set_underline(false);
-    strobe_clock();
-
-    for (uint16_t i = 1; i < len; i++) {
+    for (uint16_t i = 0; i < len; i++) {
         shift595_write((uint8_t)(addr + i), data[i]);
+        strobe_delay();
         strobe_delay();
 
         wait_ready();
+        strobe_aw();
+        strobe_delay();
+        strobe_delay();
+        set_underline(false);
         strobe_clock();
     }
 }
