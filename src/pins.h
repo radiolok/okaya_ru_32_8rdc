@@ -68,10 +68,9 @@
 #define MASK_nRESET   (1 << PC2)
 /** @} */
 
-/** @defgroup pins_hv HV boost converter */
+/** @defgroup pins_hv HV converter enable */
 /** @{ */
-#define PIN_HV_ADC    PC3  /**< HV feedback via 470k/10k divider (ADC3) */
-#define PIN_HV_PWM    PB1  /**< Boost PWM output (OC1A) */
+#define PIN_HV_EN     PB1  /**< ~EN — converter enable (active LOW: 0 = ON, 1 = OFF). Pulled HIGH externally. */
 /** @} */
 
 /** @defgroup pins_uart UART */

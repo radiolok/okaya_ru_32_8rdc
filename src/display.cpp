@@ -78,7 +78,7 @@ static void strobes_init() {
 void display_init() {
     strobes_init();
     shift595_init();
-    hv_init();
+    hv_enable();
 
     set_blank(true);
 
@@ -86,8 +86,6 @@ void display_init() {
     delayMicroseconds(500);
     strobe_nRESET();
     delayMicroseconds(500);
-
-    hv_start_soft();
 
     display_clear();
     set_blank(false);
