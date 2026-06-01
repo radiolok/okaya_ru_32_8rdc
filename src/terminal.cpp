@@ -115,16 +115,10 @@ void terminal_puts(const char *s) {
 }
 
 void terminal_flush() {
-    uint16_t i = 0;
-    while (i < TERM_SIZE) {
+    for (uint16_t i = 0; i < TERM_SIZE; i++) {
         if (dirty[i]) {
-            uint16_t start = i;
-            while (i < TERM_SIZE && dirty[i]) i++;
-            uint16_t len = i - start;
-            display_write_batch((uint8_t)start, &buf[start], len);
-            for (uint16_t j = start; j < i; j++) dirty[j] = false;
-        } else {
-            i++;
+            display_write_raw((uint8_t)i, buf[i]);
+            dirty[i] = false;
         }
     }
 }
