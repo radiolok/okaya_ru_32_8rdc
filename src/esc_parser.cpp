@@ -1,5 +1,6 @@
 #include "esc_parser.h"
 #include "terminal.h"
+#include "demo.h"
 #include <stdlib.h>
 
 enum EscState {
@@ -112,6 +113,8 @@ static void exec_csi(char final) {
         case 'h':
             if (question_mark) {
                 if (params[0] == 4) terminal_set_scroll_enabled(true);
+                else if (params[0] == 100) terminal_set_echo_enabled(true);
+                else if (params[0] == 101) { if (!demo_is_active()) demo_enter(); }
             } else {
                 if (params[0] == 4) terminal_set_insert_mode(true);
             }
@@ -120,6 +123,8 @@ static void exec_csi(char final) {
         case 'l':
             if (question_mark) {
                 if (params[0] == 4) terminal_set_scroll_enabled(false);
+                else if (params[0] == 100) terminal_set_echo_enabled(false);
+                else if (params[0] == 101) { if (demo_is_active()) demo_exit(); }
             } else {
                 if (params[0] == 4) terminal_set_insert_mode(false);
             }

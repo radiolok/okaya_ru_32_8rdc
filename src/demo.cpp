@@ -168,8 +168,8 @@ static unsigned long tw_last_ms = 0;
 static uint16_t tw_delay_ms = 0;
 
 static void demo_load_text(uint8_t idx);
-static void demo_enter();
-static void demo_exit();
+void demo_enter();
+void demo_exit();
 static void demo_next_effect();
 static void demo_switch_text_and_effect();
 static void handle_button();
@@ -183,7 +183,7 @@ bool demo_is_active() {
     return mode == MODE_DEMO;
 }
 
-static void demo_enter() {
+void demo_enter() {
     terminal_erase_all();
     terminal_flush();
     display_clear();
@@ -204,7 +204,7 @@ static void demo_enter() {
     demo_load_text(text_idx);
 }
 
-static void demo_exit() {
+void demo_exit() {
     mode = MODE_TERMINAL;
     terminal_reset();
 }

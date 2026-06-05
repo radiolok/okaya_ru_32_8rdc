@@ -1,5 +1,6 @@
 #include "terminal.h"
 #include "display.h"
+#include <Arduino.h>
 
 static uint8_t buf[TERM_SIZE];
 static bool dirty[TERM_SIZE];
@@ -8,6 +9,7 @@ static uint8_t cursor_row = 0;
 static bool insert_mode = false;
 static bool newline_pending = false;
 static bool scroll_enabled = true;
+static bool echo_enabled = false;
 
 void terminal_init() {
     for (uint16_t i = 0; i < TERM_SIZE; i++) {
@@ -111,6 +113,8 @@ void terminal_putchar(char c) {
     buf[idx] = c;
     dirty[idx] = true;
     advance_cursor();
+
+    if (echo_enabled) Serial.write(c);
 }
 
 void terminal_puts(const char *s) {
@@ -216,4 +220,8 @@ uint8_t terminal_get_cursor_row() {
 
 void terminal_set_scroll_enabled(bool scroll_on) {
     scroll_enabled = scroll_on;
+}
+
+void terminal_set_echo_enabled(bool echo_on) {
+    echo_enabled = echo_on;
 }

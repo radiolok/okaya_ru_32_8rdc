@@ -11,7 +11,7 @@ void setup() {
     terminal_init();
     esc_parser_reset();
     demo_setup();
-    Serial.begin(38400);
+    Serial.begin(9600);
 
 #ifdef DEBUG_PATTERN
     terminal_set_cursor(0, 0); terminal_puts("ALPHANUMERIC PLASMA DISPLAY 32X8");
