@@ -27,10 +27,28 @@ void setup() {
 
 #ifdef DEBUG_PATTERN
 void loop() {
+    static unsigned long last_led = 0;
+    static bool led_on = false;
+    unsigned long now = millis();
+    if (now - last_led >= 500) {
+        led_on = !led_on;
+        digitalWrite(LED_BUILTIN, led_on);
+        last_led = now;
+    }
+
     demo_tick();
 }
 #else
 void loop() {
+    static unsigned long last_led = 0;
+    static bool led_on = false;
+    unsigned long now = millis();
+    if (now - last_led >= 500) {
+        led_on = !led_on;
+        digitalWrite(LED_BUILTIN, led_on);
+        last_led = now;
+    }
+
     demo_tick();
 
     if (demo_is_active()) return;
@@ -41,7 +59,6 @@ void loop() {
     }
 
     static unsigned long last_flush = 0;
-    unsigned long now = millis();
     if (now - last_flush >= FLUSH_INTERVAL_MS) {
         terminal_flush();
         last_flush = now;
