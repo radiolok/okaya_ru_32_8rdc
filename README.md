@@ -13,7 +13,7 @@ Firmware for the Okaya RU-32-8-RDC vacuum fluorescent display module, turning it
 | Boost inductor | 100 µH / 3 A |
 | Output capacitor | 10 µF |
 | HV feedback divider | 470 kΩ / 10 kΩ → 3.33 V at 160 V |
-| UART baud rate | 115200 |
+| UART baud rate | 38400 |
 | Shift registers | 2× 74HC595 (addr + data bus, daisy-chained) |
 
 ## Pin Connections
@@ -34,6 +34,7 @@ Firmware for the Okaya RU-32-8-RDC vacuum fluorescent display module, turning it
 | A2 | PC2 | OUT | ~RESET | Display RAM reset (active LOW pulse) |
 | A3 | PC3 | IN | HV FB | HV feedback (ADC3) via 470k/10k divider |
 | D9 | PB1 | OUT | HV PWM | Boost converter PWM (OC1A, 80 kHz) |
+| D8 | PC5 | IN | BTN | Mode switch button (INPUT_PULLUP, LOW = pressed) |
 | D0 | PD0 | IN | UART RX | Serial input |
 | D1 | PD1 | OUT | UART TX | Serial output |
 
@@ -150,17 +151,34 @@ Linear: `addr = col + row × 32` (0–255). Character code 0x20 = space.
 
 - **32×8** character buffer with dirty-tracking (partial refresh)
 - **Insert/replace** modes
-- **Scrolling** on overflow
+- **Scrolling** on overflow, controllable via `ESC[?4h` / `ESC[?4l`
+- **Demo mode** — standalone slideshow with 7 animated text effects, 7 text screens stored in Flash
+- **Mode switch** via button on PC5 (D8): long press (>1 s) toggles terminal ↔ demo, short press in demo switches effect
 - **VT100 subset**:
   - `ESC[H`, `ESC[row;colH` / `ESC[row;colf` — cursor positioning
   - `ESC[nA` / `B` / `C` / `D` — cursor movement
   - `ESC[J` / `ESC[0J` / `ESC[1J` / `ESC[2J` — screen erase
   - `ESC[K` / `ESC[0K` / `ESC[1K` / `ESC[2K` — line erase
   - `ESC[4h` / `ESC[4l` — insert/replace mode
+  - `ESC[?4h` / `ESC[?4l` — scroll enable/disable
   - `ESC c` — terminal reset
 - **Control characters**: CR, LF, BS, TAB
 - **Blanking** during full-screen refresh (no flicker)
 - **Async regulator**: ADC interrupt-driven, no blocking in main loop
+
+### Demo mode effects
+
+| Effect | Description |
+|--------|-------------|
+| Typewriter | Line-by-line text output with 100–400 ms delay between lines; long texts scroll naturally |
+| Top-down | Screen fills row-by-row from top |
+| Bottom-up | Screen fills row-by-row from bottom |
+| Left-right | Screen fills column-by-column from left |
+| Right-left | Screen fills column-by-column from right |
+| Diagonal | Screen fills diagonally from a random corner |
+| Random | Pixels appear in random order with linear-scan fallback for last cells |
+
+Effects auto-switch every 5–10 seconds. Short button press forces immediate switch to a new text + random effect.
 
 ## Build & Upload
 
@@ -179,15 +197,15 @@ pio run --target upload
 Monitor serial output:
 
 ```bash
-pio device monitor --baud 115200
+pio device monitor --baud 38400
 ```
 
 ### Memory
 
 | Resource | Used | Available |
 |----------|------|-----------|
-| Flash | 3786 B | 30.7 KB |
-| RAM | 913 B | 2048 B |
+| Flash | 8316 B | 30.7 KB |
+| RAM | 1045 B | 2048 B |
 
 ## Project Structure
 
@@ -195,13 +213,14 @@ pio device monitor --baud 115200
 okaya_vfd_terminal/
 ├── platformio.ini
 ├── src/
-│   ├── main.cpp           # Setup, main loop (serial → parser → flush)
+│   ├── main.cpp           # Setup, main loop (serial → parser → flush, demo mode dispatch)
 │   ├── pins.h             # All pin definitions
 │   ├── hal_595.h/cpp      # 74HC595 shift register driver
 │   ├── hal_hv.h/cpp       # HV boost converter (Timer1 PWM + ADC ISR)
 │   ├── display.h/cpp      # Display protocol: strobe sequencing
-│   ├── terminal.h/cpp     # 32×8 buffer, dirty tracking, cursor logic
-│   └── esc_parser.h/cpp   # VT100 ESC-sequence state machine
+│   ├── terminal.h/cpp     # 32×8 buffer, dirty tracking, cursor logic, scroll control
+│   ├── esc_parser.h/cpp   # VT100 ESC-sequence state machine
+│   └── demo.h/cpp         # Demo mode: button handling, 7 text effects, PROGMEM text bank
 ```
 
 ## Known Limitations

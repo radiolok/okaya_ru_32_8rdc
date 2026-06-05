@@ -107,4 +107,6 @@ uint8_t terminal_get_cursor_col();
  */
 uint8_t terminal_get_cursor_row();
 
+void terminal_set_scroll_enabled(bool scroll_on);
+
 #endif

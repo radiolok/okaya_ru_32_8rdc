@@ -2,6 +2,7 @@
 #include "display.h"
 #include "terminal.h"
 #include "esc_parser.h"
+#include "demo.h"
 
 #define FLUSH_INTERVAL_MS  33
 
@@ -9,7 +10,8 @@ void setup() {
     display_init();
     terminal_init();
     esc_parser_reset();
-    Serial.begin(9600);
+    demo_setup();
+    Serial.begin(38400);
 
 #ifdef DEBUG_PATTERN
     terminal_set_cursor(0, 0); terminal_puts("ALPHANUMERIC PLASMA DISPLAY 32X8");
@@ -25,9 +27,14 @@ void setup() {
 
 #ifdef DEBUG_PATTERN
 void loop() {
+    demo_tick();
 }
 #else
 void loop() {
+    demo_tick();
+
+    if (demo_is_active()) return;
+
     while (Serial.available()) {
         char c = (char)Serial.read();
         esc_parser_feed(c);

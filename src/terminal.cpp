@@ -7,6 +7,7 @@ static uint8_t cursor_col = 0;
 static uint8_t cursor_row = 0;
 static bool insert_mode = false;
 static bool newline_pending = false;
+static bool scroll_enabled = true;
 
 void terminal_init() {
     for (uint16_t i = 0; i < TERM_SIZE; i++) {
@@ -54,7 +55,7 @@ static void advance_cursor() {
         cursor_row++;
         if (cursor_row >= TERM_ROWS) {
             cursor_row = TERM_ROWS - 1;
-            scroll_up();
+            if (scroll_enabled) scroll_up();
         }
     }
 }
@@ -68,7 +69,7 @@ void terminal_putchar(char c) {
         cursor_col = 0;
         if (cursor_row < TERM_ROWS - 1) {
             cursor_row++;
-        } else {
+        } else if (scroll_enabled) {
             scroll_up();
         }
         newline_pending = true;
@@ -211,4 +212,8 @@ uint8_t terminal_get_cursor_col() {
 
 uint8_t terminal_get_cursor_row() {
     return cursor_row;
+}
+
+void terminal_set_scroll_enabled(bool scroll_on) {
+    scroll_enabled = scroll_on;
 }

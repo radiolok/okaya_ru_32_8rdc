@@ -110,14 +110,18 @@ static void exec_csi(char final) {
             break;
 
         case 'h':
-            if (params[0] == 4) {
-                terminal_set_insert_mode(true);
+            if (question_mark) {
+                if (params[0] == 4) terminal_set_scroll_enabled(true);
+            } else {
+                if (params[0] == 4) terminal_set_insert_mode(true);
             }
             break;
 
         case 'l':
-            if (params[0] == 4) {
-                terminal_set_insert_mode(false);
+            if (question_mark) {
+                if (params[0] == 4) terminal_set_scroll_enabled(false);
+            } else {
+                if (params[0] == 4) terminal_set_insert_mode(false);
             }
             break;
 
