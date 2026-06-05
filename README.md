@@ -9,11 +9,8 @@ Firmware for the Okaya RU-32-8-RDC vacuum fluorescent display module, turning it
 | Display | Okaya RU-32-8-RDC, 32 columns × 8 rows |
 | Controller | Arduino Nano (ATmega328P @ 16 MHz) |
 | Logic supply | 5 V (shared with Nano) |
-| Anode supply | 160 V via boost converter |
-| Boost inductor | 100 µH / 3 A |
-| Output capacitor | 10 µF |
-| HV feedback divider | 470 kΩ / 10 kΩ → 3.33 V at 160 V |
-| UART baud rate | 38400 |
+| Anode supply | External HV module, enabled via PB1 (active LOW) |
+| UART baud rate | 9600 |
 | Shift registers | 2× 74HC595 (addr + data bus, daisy-chained) |
 
 ## Pin Connections
@@ -32,9 +29,9 @@ Firmware for the Okaya RU-32-8-RDC vacuum fluorescent display module, turning it
 | A0 | PC0 | OUT | ~WR | Unused, held HIGH |
 | A1 | PC1 | OUT | ~BL | Blanking (active LOW — blanks ROM output) |
 | A2 | PC2 | OUT | ~RESET | Display RAM reset (active LOW pulse) |
-| A3 | PC3 | IN | HV FB | HV feedback (ADC3) via 470k/10k divider |
-| D9 | PB1 | OUT | HV PWM | Boost converter PWM (OC1A, 80 kHz) |
-| D8 | PC5 | IN | BTN | Mode switch button (INPUT_PULLUP, LOW = pressed) |
+| D7 | PD7 | OUT | LED | Heartbeat LED (toggles each loop iteration) |
+| D9 | PB1 | OUT | ~EN | HV module enable (active LOW: 0 = ON, 1 = OFF) |
+| A5 | PC5 | IN | BTN | Mode switch button (INPUT_PULLUP, LOW = pressed) |
 | D0 | PD0 | IN | UART RX | Serial input |
 | D1 | PD1 | OUT | UART TX | Serial output |
 
@@ -136,17 +133,6 @@ Linear: `addr = col + row × 32` (0–255). Character code 0x20 = space.
   does not auto-increment, `display_write_batch()` will need to be modified to assert
   AW on every write instead of just the first.
 
-## Boost Converter
-
-| Parameter | Value |
-|-----------|-------|
-| Frequency | 80 kHz (Timer1 Fast PWM, ICR1=24, prescaler 8) |
-| Resolution | 25 steps (5-bit) |
-| Regulation | P-controller @ 9.6 kHz (ADC free-running + ISR) |
-| Soft-start | 1.5 s linear ramp, then regulator takeover |
-| Timeout | 3 s to reach target, emergency shutdown on failure |
-| Target ADC | 683 (10-bit, AVCC ref) = 160 V ÷ 480k × 10k = 3.33 V |
-
 ## Features
 
 - **32×8** character buffer with dirty-tracking (partial refresh)
@@ -161,10 +147,12 @@ Linear: `addr = col + row × 32` (0–255). Character code 0x20 = space.
   - `ESC[K` / `ESC[0K` / `ESC[1K` / `ESC[2K` — line erase
   - `ESC[4h` / `ESC[4l` — insert/replace mode
   - `ESC[?4h` / `ESC[?4l` — scroll enable/disable
+  - `ESC[?100h` / `ESC[?100l` — echo enable/disable (duplicates display output to Serial)
+  - `ESC[?101h` / `ESC[?101l` — enter/exit demo mode remotely
   - `ESC c` — terminal reset
 - **Control characters**: CR, LF, BS, TAB
+- **Heartbeat LED** on D7 (PD7) — toggles each `loop()` iteration for liveness check
 - **Blanking** during full-screen refresh (no flicker)
-- **Async regulator**: ADC interrupt-driven, no blocking in main loop
 
 ### Demo mode effects
 
@@ -197,15 +185,15 @@ pio run --target upload
 Monitor serial output:
 
 ```bash
-pio device monitor --baud 38400
+pio device monitor --baud 9600
 ```
 
 ### Memory
 
 | Resource | Used | Available |
 |----------|------|-----------|
-| Flash | 8316 B | 30.7 KB |
-| RAM | 1045 B | 2048 B |
+| Flash | ~8480 B | 30.7 KB |
+| RAM | ~1050 B | 2048 B |
 
 ## Project Structure
 
@@ -216,7 +204,7 @@ okaya_vfd_terminal/
 │   ├── main.cpp           # Setup, main loop (serial → parser → flush, demo mode dispatch)
 │   ├── pins.h             # All pin definitions
 │   ├── hal_595.h/cpp      # 74HC595 shift register driver
-│   ├── hal_hv.h/cpp       # HV boost converter (Timer1 PWM + ADC ISR)
+│   ├── hal_hv.h/cpp       # HV module enable (GPIO toggle)
 │   ├── display.h/cpp      # Display protocol: strobe sequencing
 │   ├── terminal.h/cpp     # 32×8 buffer, dirty tracking, cursor logic, scroll control
 │   ├── esc_parser.h/cpp   # VT100 ESC-sequence state machine
@@ -229,7 +217,7 @@ okaya_vfd_terminal/
 - **~AD pin function** is assumed to be UL (Underline). If the display uses it as WIDE instead, `set_underline()` needs to be replaced with `set_wide()`.
 - **Auto-increment** is assumed to work per the reference display. Verification on hardware pending.
 - **~BL** implements binary blanking only (no PWM brightness control).
-- **DEBUG_PATTERN** build flag (`platformio.ini`) enables a test loop that writes 0x55/0xAA alternating to all 256 addresses — useful for hardware debugging.
+- **DEBUG_PATTERN** build flag (`platformio.ini`) shows a static 8-line test pattern at boot instead of running the serial terminal loop.
 
 ---
 

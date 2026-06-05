@@ -5,12 +5,14 @@
 #include "demo.h"
 
 #define FLUSH_INTERVAL_MS  33
+#define LED_PIN 7
 
 void setup() {
     display_init();
     terminal_init();
     esc_parser_reset();
     demo_setup();
+    pinMode(LED_PIN, OUTPUT);
     Serial.begin(9600);
 
 #ifdef DEBUG_PATTERN
@@ -27,27 +29,17 @@ void setup() {
 
 #ifdef DEBUG_PATTERN
 void loop() {
-    static unsigned long last_led = 0;
     static bool led_on = false;
-    unsigned long now = millis();
-    if (now - last_led >= 500) {
-        led_on = !led_on;
-        digitalWrite(LED_BUILTIN, led_on);
-        last_led = now;
-    }
+    led_on = !led_on;
+    digitalWrite(LED_PIN, led_on);
 
     demo_tick();
 }
 #else
 void loop() {
-    static unsigned long last_led = 0;
     static bool led_on = false;
-    unsigned long now = millis();
-    if (now - last_led >= 500) {
-        led_on = !led_on;
-        digitalWrite(LED_BUILTIN, led_on);
-        last_led = now;
-    }
+    led_on = !led_on;
+    digitalWrite(LED_PIN, led_on);
 
     demo_tick();
 
@@ -59,6 +51,7 @@ void loop() {
     }
 
     static unsigned long last_flush = 0;
+    unsigned long now = millis();
     if (now - last_flush >= FLUSH_INTERVAL_MS) {
         terminal_flush();
         last_flush = now;
