@@ -1,3 +1,5 @@
+![](img/okaya_ru_32_8.jpg)
+
 # Okaya RU-32-8-RDC VFD Terminal
 
 Firmware for the Okaya RU-32-8-RDC vacuum fluorescent display module, turning it into a VT100-compatible serial terminal using an Arduino Nano (ATmega328P).
