@@ -16,6 +16,15 @@
 /** @brief Reset pulse width in microseconds. */
 #define DISP_RESET_DELAY_US  100
 
+/** @brief Map a character code onto the display's 6-bit (D0–D5) glyph set.
+ *
+ * The bus carries only D0–D5, so 0x60–0x7F would alias onto 0x20–0x3F
+ * (e.g. 'x' shows as '8'). Lowercase letters are folded to uppercase.
+ */
+static inline uint8_t display_map_char(uint8_t ch) {
+    return (ch >= 'a' && ch <= 'z') ? (uint8_t)(ch - ('a' - 'A')) : ch;
+}
+
 /** @brief Pulse AW (Address Write): ~AS LOW → delay → HIGH. */
 void strobe_aw();
 /** @brief Pulse CLOCK (character data latch): NS7 HIGH → delay → LOW. */

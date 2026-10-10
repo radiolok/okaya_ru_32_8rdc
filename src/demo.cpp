@@ -1,10 +1,10 @@
 #include "demo.h"
 #include "display.h"
 #include "terminal.h"
+#include "pins.h"
 #include <Arduino.h>
 #include <avr/pgmspace.h>
 
-#define PIN_BUTTON       PC5
 #define LONG_PRESS_MS    1000
 #define DEBOUNCE_MS      50
 #define EFFECT_MIN_MS    5000
@@ -158,7 +158,7 @@ static unsigned long next_switch = 0;
 
 static uint16_t reveal_count = 0;
 static uint8_t diag_dist = 0;
-static uint8_t diag_cell = 0;
+static uint16_t diag_cell = 0;
 static uint8_t diag_dir = DIAG_TL;
 static uint8_t rand_visited[32];
 
@@ -175,7 +175,9 @@ static void demo_switch_text_and_effect();
 static void handle_button();
 
 void demo_setup() {
-    pinMode(PIN_BUTTON, INPUT_PULLUP);
+    // PC5 is Arduino A5. pinMode(PC5, ...) would configure D5 (PD5, ~AD) instead.
+    DDR_BTN  &= ~MASK_BTN;
+    PORT_BTN |= MASK_BTN;
     randomSeed(analogRead(A7));
 }
 
@@ -233,7 +235,7 @@ static void demo_switch_text_and_effect() {
 
 static void demo_load_text(uint8_t idx) {
     memset(screen_buf, ' ', DISP_SIZE);
-    const char* p = (const char*)pgm_read_word(&text_table[idx]);
+    const char* p = (const char*)pgm_read_ptr(&text_table[idx]);
     uint8_t row = 0;
     uint8_t col = 0;
     char c;
@@ -255,7 +257,7 @@ static void demo_load_text(uint8_t idx) {
 }
 
 static void handle_button() {
-    bool pressed = !(PINC & (1 << PIN_BUTTON));
+    bool pressed = !(PIN_BTN_REG & MASK_BTN);
 
     if (pressed) {
         if (!btn_pressed) {
@@ -295,7 +297,7 @@ static bool tw_tick() {
 
     if ((now - tw_last_ms) < tw_delay_ms) return true;
 
-    uint16_t p = pgm_read_word(&text_table[text_idx]);
+    const char* p = (const char*)pgm_read_ptr(&text_table[text_idx]);
 
     while (true) {
         char c = pgm_read_byte(p + tw_offset);
@@ -444,7 +446,7 @@ static bool effect_is_done() {
 static void effect_tick() {
     unsigned long now = millis();
 
-    if (effect_is_done() && now >= next_switch) {
+    if (effect_is_done() && (long)(now - next_switch) >= 0) {
         demo_switch_text_and_effect();
         return;
     }

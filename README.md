@@ -91,8 +91,9 @@ for i in 1..N-1:
     strobe_clock()                — data latch + auto-increment
 ```
 
-This is implemented in `display_write_batch()` and is used by `terminal_flush()`
-when it detects contiguous dirty ranges in the terminal buffer.
+This is described for `display_write_batch()`, but the current implementation still
+strobes AW for every character (safe until auto-increment is verified on hardware).
+`terminal_flush()` writes each dirty cell individually with `display_write_raw()`.
 
 ### Timing
 
@@ -141,7 +142,7 @@ Linear: `addr = col + row × 32` (0–255). Character code 0x20 = space.
 - **Insert/replace** modes
 - **Scrolling** on overflow, controllable via `ESC[?4h` / `ESC[?4l`
 - **Demo mode** — standalone slideshow with 7 animated text effects, 7 text screens stored in Flash
-- **Mode switch** via button on PC5 (D8): long press (>1 s) toggles terminal ↔ demo, short press in demo switches effect
+- **Mode switch** via button on PC5 (A5): long press (>1 s) toggles terminal ↔ demo, short press in demo switches effect
 - **VT100 subset**:
   - `ESC[H`, `ESC[row;colH` / `ESC[row;colf` — cursor positioning
   - `ESC[nA` / `B` / `C` / `D` — cursor movement
@@ -150,9 +151,11 @@ Linear: `addr = col + row × 32` (0–255). Character code 0x20 = space.
   - `ESC[4h` / `ESC[4l` — insert/replace mode
   - `ESC[?4h` / `ESC[?4l` — scroll enable/disable
   - `ESC[?100h` / `ESC[?100l` — echo enable/disable (duplicates display output to Serial)
-  - `ESC[?101h` / `ESC[?101l` — enter/exit demo mode remotely
+  - `ESC[?101h` / `ESC[?101l` — enter/exit demo mode remotely (while the demo runs, all other input is ignored)
   - `ESC c` — terminal reset
-- **Control characters**: CR, LF, BS, TAB
+  - Other `ESC x` sequences are discarded
+- **Control characters**: CR, LF, BS, TAB. CR or LF starts a new line; a CR+LF or LF+CR pair counts as one newline
+- **Lowercase** letters are shown as uppercase (the data bus is 6-bit, D0–D5)
 - **Heartbeat LED** on D7 (PD7) — toggles each `loop()` iteration for liveness check
 - **Blanking** during full-screen refresh (no flicker)
 
@@ -184,6 +187,14 @@ Upload to connected Arduino Nano:
 pio run --target upload
 ```
 
+Run the host unit tests (terminal, ESC parser, demo effects, against Arduino/display fakes):
+
+```bash
+pio test -e native
+```
+
+CI (`.github/workflows/ci.yml`) runs the tests and builds the firmware (normal and `DEBUG_PATTERN`) on every push and PR.
+
 Monitor serial output:
 
 ```bash
@@ -194,7 +205,7 @@ pio device monitor --baud 9600
 
 | Resource | Used | Available |
 |----------|------|-----------|
-| Flash | ~8480 B | 30.7 KB |
+| Flash | ~8620 B | 30.7 KB |
 | RAM | ~1050 B | 2048 B |
 
 ## Project Structure
@@ -211,6 +222,9 @@ pio device monitor --baud 9600
 │   ├── terminal.h/cpp     # 32×8 buffer, dirty tracking, cursor logic, scroll control
 │   ├── esc_parser.h/cpp   # VT100 ESC-sequence state machine
 │   └── demo.h/cpp         # Demo mode: button handling, 7 text effects, PROGMEM text bank
+└── test/
+    ├── mocks/             # Host stand-ins for Arduino.h, avr/io.h, avr/pgmspace.h
+    └── test_host/         # Unity tests + fake display driver (pio test -e native)
 ```
 
 ## Known Limitations

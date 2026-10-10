@@ -43,12 +43,13 @@ void loop() {
 
     demo_tick();
 
-    if (demo_is_active()) return;
-
+    // Serial is parsed in demo mode too, so ESC[?101l can leave it remotely.
     while (Serial.available()) {
         char c = (char)Serial.read();
         esc_parser_feed(c);
     }
+
+    if (demo_is_active()) return;
 
     static unsigned long last_flush = 0;
     unsigned long now = millis();

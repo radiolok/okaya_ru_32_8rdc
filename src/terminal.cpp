@@ -7,7 +7,7 @@ static bool dirty[TERM_SIZE];
 static uint8_t cursor_col = 0;
 static uint8_t cursor_row = 0;
 static bool insert_mode = false;
-static bool newline_pending = false;
+static char newline_pending = 0;  /**< CR or LF that just produced a newline; its CRLF/LFCR partner is swallowed */
 static bool scroll_enabled = true;
 static bool echo_enabled = false;
 
@@ -19,6 +19,7 @@ void terminal_init() {
     cursor_col = 0;
     cursor_row = 0;
     insert_mode = false;
+    newline_pending = 0;
 }
 
 void terminal_reset() {
@@ -64,8 +65,8 @@ static void advance_cursor() {
 
 void terminal_putchar(char c) {
     if (c == '\r' || c == '\n') {
-        if (newline_pending) {
-            newline_pending = false;
+        if (newline_pending && newline_pending != c) {
+            newline_pending = 0;
             return;
         }
         cursor_col = 0;
@@ -74,10 +75,14 @@ void terminal_putchar(char c) {
         } else if (scroll_enabled) {
             scroll_up();
         }
-        newline_pending = true;
+        newline_pending = c;
+        if (echo_enabled) {
+            Serial.write('\r');
+            Serial.write('\n');
+        }
         return;
     }
-    newline_pending = false;
+    newline_pending = 0;
 
     if (c == '\b') {
         if (cursor_col > 0) {
@@ -138,14 +143,14 @@ void terminal_move_cursor_up(uint8_t n) {
 
 void terminal_move_cursor_down(uint8_t n) {
     if (n == 0) n = 1;
-    cursor_row += n;
-    if (cursor_row >= TERM_ROWS) cursor_row = TERM_ROWS - 1;
+    if (n >= TERM_ROWS - cursor_row) cursor_row = TERM_ROWS - 1;
+    else cursor_row += n;
 }
 
 void terminal_move_cursor_right(uint8_t n) {
     if (n == 0) n = 1;
-    cursor_col += n;
-    if (cursor_col >= TERM_COLS) cursor_col = TERM_COLS - 1;
+    if (n >= TERM_COLS - cursor_col) cursor_col = TERM_COLS - 1;
+    else cursor_col += n;
 }
 
 void terminal_move_cursor_left(uint8_t n) {

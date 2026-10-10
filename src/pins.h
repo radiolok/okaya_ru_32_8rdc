@@ -73,6 +73,15 @@
 #define PIN_HV_EN     PB1  /**< ~EN — converter enable (active LOW: 0 = ON, 1 = OFF). Pulled HIGH externally. */
 /** @} */
 
+/** @defgroup pins_btn Mode button (A5 / PC5, INPUT_PULLUP, LOW = pressed) */
+/** @{ */
+#define PIN_BTN       PC5
+#define PORT_BTN      PORTC
+#define DDR_BTN       DDRC
+#define PIN_BTN_REG   PINC
+#define MASK_BTN      (1 << PC5)
+/** @} */
+
 /** @defgroup pins_uart UART */
 /** @{ */
 #define PIN_UART_RX   PD0  /**< UART RX */

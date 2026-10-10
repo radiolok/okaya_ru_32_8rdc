@@ -1,7 +1,6 @@
 #include "esc_parser.h"
 #include "terminal.h"
 #include "demo.h"
-#include <stdlib.h>
 
 enum EscState {
     STATE_NORMAL,
@@ -33,41 +32,38 @@ static void parse_params() {
 
     if (param_idx == 0) return;
 
-    char *p = param_buf;
+    // Values saturate at 255: larger counts/coordinates are clamped anyway.
+    const char *p = param_buf;
     for (uint8_t i = 0; i < 2; i++) {
-        char *end = p;
-        while (*end && *end != ';') end++;
-        char saved = *end;
-        *end = '\0';
-        if (*p) {
-            params[i] = atoi(p);
-            num_params = i + 1;
+        while (*p >= '0' && *p <= '9') {
+            params[i] = params[i] * 10 + (*p - '0');
+            if (params[i] > 255) params[i] = 255;
+            p++;
         }
-        *end = saved;
-        if (saved == ';') {
-            p = end + 1;
-        } else {
-            break;
-        }
+        num_params = i + 1;
+        if (*p != ';') break;
+        p++;
     }
 }
 
 static void exec_csi(char final) {
     parse_params();
 
+    // While the demo owns the display, only the demo-exit sequence is honoured.
+    if (demo_is_active()) {
+        if (question_mark && final == 'l' && params[0] == 101) demo_exit();
+        return;
+    }
+
     int16_t n = (num_params >= 1 && params[0] > 0) ? params[0] : 1;
 
     switch (final) {
         case 'H':
         case 'f':
-            if (num_params >= 2) {
-                terminal_set_cursor(
-                    (params[1] > 0) ? (uint8_t)(params[1] - 1) : 0,
-                    (params[0] > 0) ? (uint8_t)(params[0] - 1) : 0
-                );
-            } else {
-                terminal_set_cursor(0, 0);
-            }
+            terminal_set_cursor(
+                (params[1] > 0) ? (uint8_t)(params[1] - 1) : 0,
+                (params[0] > 0) ? (uint8_t)(params[0] - 1) : 0
+            );
             break;
 
         case 'A':
@@ -142,6 +138,7 @@ bool esc_parser_feed(char c) {
                 state = STATE_ESC;
                 return false;
             }
+            if (demo_is_active()) return false;
             terminal_putchar(c);
             return true;
 
@@ -155,14 +152,15 @@ bool esc_parser_feed(char c) {
                 question_mark = false;
                 return false;
             }
-            if (c == 'c') {
-                terminal_reset();
-                state = STATE_NORMAL;
+            if (c == 0x1B) {
                 return false;
             }
-            terminal_putchar(c);
+            if (c == 'c' && !demo_is_active()) {
+                terminal_reset();
+            }
+            // Unsupported two-byte sequences (ESC 7, ESC D, ...) are discarded.
             state = STATE_NORMAL;
-            return true;
+            return false;
 
         case STATE_CSI_PARAM:
             if (c >= '0' && c <= '9') {
